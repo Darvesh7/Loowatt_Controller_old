@@ -1,0 +1,763 @@
+/***************************************************************************************
+* Name:      LW_Controller_Func.C
+* 
+* Revision: draft
+*
+* Author:     Phil Hockley
+*
+* Description:
+*          Control PCB functions.
+*
+* History:    30/03/15   Initial code started
+*         
+****************************************************************************************/
+#INT_TIMER1
+void stop_motor (void)
+{
+   Motor_STOP();
+   stop_flag = 1;
+}
+
+
+#INT_TIMER4
+void beep_time (void)
+{
+   extern int8 IO_STATE;
+   extern int16 beep_rate,beep_time,beep_count;
+   extern int8 beep_mode;
+
+   beep_count++;
+   if(beep_count <= beep_time)
+   {
+      IO_STATE |= BUZZER;
+   }
+   else
+   {
+      IO_STATE &= ~BUZZER;
+      if(beep_mode == once)
+      {
+         DIS_BEEP_INT;
+         RESET_BEEP_IF;
+         beep_count = 0;
+      }
+   }
+   if(beep_count >= beep_rate)
+   {
+      beep_count = 0;
+   }
+}   
+
+#INT_TIMER6
+void flash_time (void)
+{   //will flash both IO_STATE and alarm outputs
+   extern int8 IO_STATE;
+   extern int8 flash_what;
+   extern int16 flash_count,flash_rate,flash_time;
+
+   flash_count++;
+   if(flash_count <= flash_time)
+   {
+      IO_STATE |= flash_what;
+   }
+   if(flash_count > flash_time)
+   {
+      IO_STATE &= ~flash_what;
+   }
+   if(flash_count > flash_rate)   
+   {
+      flash_count = 0;
+   }
+}   
+
+void INIT_ALL (void)
+{
+   extern int8 LooSTATUS;
+   extern int16 TL_DATA[TX_MESS_WORDS];
+   extern UNIT_ADR;
+
+   OSCCON = 0b01110010;
+   PORTA = 0b00000000;
+   PORTB = 0b00000000;
+   PORTC = 0b00000000;   
+   PORTD = 0b00000000;
+   PORTE = 0b00000000;
+   PORTF = 0b00000000;
+   PORTG = 0b00000000;
+   TRISA = 0;
+   TRISB = 0b00000011;
+   TRISC = 0b10001111;
+   TRISD = 0;
+   TRISE = 0;
+   TRISF = 0b00000101;
+   TRISG = 0b00001100;
+   ADCON0 = 0b00011101;
+   ADCON1 = 0b10010011;   //now FVR x4   
+   ANSELA = 0;
+   ANSELG = 0b00001000;      
+   ANSELF = 0b00000100;      
+   T1CON = 0x80;
+   PR2 = 39;            //10mS tick at 8MHz
+   TMR2 = 0;
+   PR4 = PR_100mS;
+   PR6 = PR_100mS;
+   T4CON = 0b01111111;
+   T6CON = 0b01111111;
+   WDTCON = 0b00011000;   //under FW control, and off!
+   //set up required interrupts
+   INTCON = 0;   //Don't allow global interrupts yet
+   RC1REG = 0;
+   RC1REG = 0;   
+   //load addr in EEPROM (0-10)
+   UNIT_ADR = read_eeprom(unit_addr_addr);
+   //get any saved status from EEPROM
+   LooSTATUS = read_eeprom(status_addr);
+   BAG_LEFT = read_eeprom(Bag_len_addr);
+   BAG_LEFT += (256 * read_eeprom(Bag_len_addr+1));
+   reset_all_log_data();
+   if((LooSTATUS == 0xFF) || (BAG_LEFT == 0xFFFF))
+   {   //if nothing in EEPROM reset all to zero.
+      LooSTATUS = SERSTATE;
+      BAG_LEFT  = BAG_LENGTH;
+      write_eeprom(status_addr,LooSTATUS);
+      write_eeprom(Bag_len_addr,(int8)BAG_LEFT);
+      write_eeprom(Bag_len_addr+1,((int8)(BAG_LEFT/256))); 
+
+   }
+   else
+   {
+      LooSTATUS = 0;         //clear ready to get new state
+      BAG_USED = BAG_LENGTH - KNOT_LEN;
+      BAG_USED = BAG_USED - BAG_LEFT;
+   }
+   IO_STATE |= FLUSH;
+   UPDATE_IO(IO_STATE);
+   NO_RESETS = 0;         //reset number of resets.
+   CM3CON0 = 0b10000010;
+   CM3CON1 = 0b00100000;
+   FVRCON = 0b100001011;   
+
+   PIE1 = 0b00100001;   //USART 1 RX Interrupt
+   PIE2 = 0;
+   PIE3 = 0;
+   PIE4 = 0;         //b00100000;   //USART2 RX Interrupt
+   PIR1 = 0;
+   PIR2 = 0;
+   PIR3 = 0;
+   PIR4 = 0;
+   PEIE = 1;
+   GIE = 1;
+   OPTION_REG = 0b00000111;
+   T2CON = 0b00111111;      //start 10mS tick
+}
+
+
+void INIT_ATTENDANT_USART (void)
+{
+   int8 junk;
+
+   SP1BRGL = 25;
+   SP1BRGH = 0;
+   RC1STA = 0b10000000;
+   TX1STA = 0b00100100;
+   BAUD1CON = 0b0000000;
+   TXRX = DIR_RX;
+   RX1_EN = ON;
+   junk = COMM_IN;
+}
+
+void INIT_BOOT_USART (void)
+{
+   int8 junk;
+
+   SP2BRGL = 25;
+   SP2BRGH = 0;
+   RC2STA = 0b10000000;
+   TX2STA = 0b00100100;
+   RX1_EN = ON;
+   junk = BOOT_IN;
+}
+
+void reset_all_log_data(void)
+{
+   extern int16 TL_DATA[TX_MESS_WORDS];
+
+   MFB_USED = 0;         //Motor Forward Bag Used
+   MBB_USED = 0;          //Motor Back Bag Used
+   NOI_FLUSH = 0;         //No of Intial flushes
+   NOIB_USED = 0;         //Inital flush bag used
+   NOS_FLUSH = 0;         //No of secondary flushes
+   NOSB_USED = 0;         //secondary flush bag used
+   NO_BLOCKS = 0;          //number of blockages
+}
+
+void wait_for_tick (void)
+{
+   extern IO_STATE;
+
+   CHK_BATT();      //if battery fail detected, tick will be prolonged
+   restart_wdt();
+    while(TMR2_IF == 0);
+   TMR2_IF = 0;
+}
+
+
+
+void CHK_BATT (void)
+{   //reads battery Voltage, and averages over 4 samples
+   //throwing out the first reading. If below setpoint 
+   //stores data in EEPROM.
+
+   extern int16 TL_DATA[TX_MESS_WORDS];
+   extern int8 LooSTATUS;
+   extern int8 batt_low_flag;
+   int8 i;
+   int32 result;
+
+   result = 0;
+
+   for(i=0;i<3;i++)
+   {
+      delay_us(20);      //aq time
+      GO_DONE = 1;      //start ADC
+      while(GO_DONE);
+      if(i != 0) result += ((int16)(ADRESH*256) + (int16)(ADRESL));
+   }
+   result = result/2;
+
+   if((int16)result < BATT_NOK_LIM)
+   {
+/*
+for(i=0;i<200;i++)
+{
+   write_eeprom(i,i);
+}
+while(1);
+*/
+      if(batt_low_flag == 0)
+      {   //only save once, or until battery is OK again
+         batt_low_flag = 1;      //inform states that we need to go into service mode
+         write_eeprom(status_addr,LooSTATUS);
+         write_eeprom(Bag_len_addr,(int8)BAG_LEFT);
+         write_eeprom(Bag_len_addr+1,(int8)(BAG_LEFT/256));
+         //may add some more things to store in MK3
+      }
+   } 
+   else if ((int16)result > BATT_OK_LIM)
+   {
+      batt_low_flag = 0;      //inform states that we need to go into service mode
+   }                                       
+}
+
+
+void UPDATE_IO(int8 IO_STATE)
+{
+   if((IO_STATE & MODE_OFF) == MODE_OFF) {LED_OFF = 1;} else {LED_OFF = 0;}
+   if((IO_STATE & MODE_RUN) == MODE_RUN) {LED_RUN = 1;} else {LED_RUN = 0;}
+   if((IO_STATE & MODE_SER) == MODE_SER) {LED_SER = 1;} else {LED_SER = 0;}
+   if((IO_STATE & BUZZER) == BUZZER) {BUZZER_ON = 1;} else {BUZZER_ON = 0;}
+   if((IO_STATE & FLUSH) == FLUSH) {LED_FLUSH = 1;} else {LED_FLUSH = 0;}
+}
+
+void Motor_FWD (int16 init_count)
+{
+   set_timer1(init_count);
+   MOTOR_OUT2 = 1;
+   delay_us(5);
+   MOTOR_OUT1 = 1;
+   ENCODER_START;
+}
+
+void Motor_BACK (int16 init_count)
+{
+   set_timer1(init_count);
+   MOTOR_OUT3 = 1;
+   delay_us(5);
+   MOTOR_OUT0 = 1;
+   ENCODER_START;
+}
+      
+void Motor_STOP (void)
+{
+   MOTOR_OUT0 = 0;
+   MOTOR_OUT1 = 0;
+   DELAY1US
+   MOTOR_OUT2 = 0;
+   MOTOR_OUT3 = 0;
+   delay_us(20);   //allows P-CH time to turn off properly
+   ENCODER_STOP;   //Stop encoder count.
+}
+
+int8 check_flush(void)
+{
+   extern int8 IO_STATE;
+   static int8 flush_cnt = 0;
+   static int8 long_F_cnt = 0;      //determines how many long flushes have been done in the timeout.
+   static int8 short_F_cnt = 0;   //determines how many short flushes have been done in the timeout.
+   static int16 flush_done_time_out = 0;   //counts for set number of  seconds before allowing flushes after all limits exceeded.
+   static int16 last_press_count = last_press_timeout;      //counts the time between the last flush and the next test.
+   int16 f_length;
+   int8 state_now;
+
+   //check to see if total flushes in timeout period exceeded
+   if(last_press_count) last_press_count--;
+   if(last_press_count == 0)
+   {
+      last_press_count = last_press_timeout;
+      short_F_cnt = 0;
+      long_f_cnt = 0;   
+   }
+
+   if(short_F_cnt >= max_short_flushes) 
+   {
+      flush_done_time_out++;
+      if(flush_done_time_out < flush_TO_limit)
+      {
+         IO_STATE &= ~FLUSH;
+         return RUNNING;         //no flushes until time out done
+      }
+      else
+      {
+         flush_done_time_out = 0;
+         short_F_cnt = 0;
+         long_f_cnt = 0;   
+         IO_STATE |= FLUSH;
+      }
+   }
+
+   if(!FLUSH_SW)
+   {
+      flush_cnt++;
+   }
+   else
+   {
+      flush_cnt = 0;
+   }
+   if(flush_cnt > debounce_time_pressed) 
+   {
+      flush_cnt = 0;
+      if(long_F_cnt >= max_long_flushes) 
+      {
+         f_length = short_flush;
+         short_F_cnt++;
+      } 
+      else 
+      {
+         f_length = long_flush;
+         long_F_cnt++;
+      }
+      IO_STATE &= ~FLUSH;
+      last_press_count = last_press_timeout;
+      state_now = activate_flush(f_length);
+      if(state_now == BLOCKED)
+      {
+         last_press_count = 0;
+         flush_done_time_out = 0;
+         short_F_cnt = 0;
+         long_f_cnt = 0;   
+         return    BLOCKED;
+      }
+   }
+   return RUNNING;
+}
+
+
+int8 check_fwd (int8 state_in)
+{
+   extern int16 int16 TL_DATA[TX_MESS_WORDS];
+   static int8 fwd_cnt = 0;
+   int8 tick_cnt10 = 0;
+   int16 time_past = 0,value;
+
+   if(!FWD)
+   {
+      fwd_cnt++;
+   }
+   else
+   {
+      fwd_cnt = 0;
+   }
+   if(fwd_cnt > debounce_time_pressed)
+   {   //turn motor on until key released
+      IO_STATE &= ~BUZZER;
+      Motor_FWD(0);
+      while(!FWD)
+      {
+         UPDATE_IO(IO_STATE);
+         wait_for_tick();
+         tick_cnt10++;
+         if(tick_cnt10 > 10)
+         {
+            tick_cnt10 = 0;
+            time_past++;
+            if(check_stalled(time_past,0))
+            {
+               Motor_STOP();
+               if(state_in == RUNNING)
+               {
+                  value = cal_bagused(READ_ENCODER);
+                  BAG_USED += value;
+                  BAG_LEFT -= value;
+                  if(BAG_LEFT >= OVERFLOW_LIM) BAG_LEFT = 0;
+                  MFB_USED += value;
+                  return BLOCKED;
+               }
+            }
+         }
+      }
+      Motor_STOP();
+      if(state_in == RUNNING)
+      {
+         value = cal_bagused(READ_ENCODER*0.8);
+         BAG_USED += value;
+         BAG_LEFT -= value;
+         if(BAG_LEFT >= OVERFLOW_LIM) BAG_LEFT = 0;
+         MFB_USED += value;
+      }
+   }
+   return state_in;
+}
+         
+int8 check_bck (state_in)
+{
+   extern int16 TL_DATA[TX_MESS_WORDS];
+   static int8 bck_cnt = 0;
+   int8 tick_cnt10 = 0;
+   int16 time_past = 0,value;
+
+   if(!BCK)
+   {
+      bck_cnt++;
+   }
+   else
+   {
+      bck_cnt = 0;
+   }
+   if(bck_cnt > debounce_time_pressed)
+   {   //turn motor on until key released
+      IO_STATE &= ~BUZZER;
+      Motor_BACK(0);
+
+      while(!BCK)
+      {
+         UPDATE_IO(IO_STATE);
+         wait_for_tick();
+         tick_cnt10++;
+         if(tick_cnt10 > 10)
+         {
+            tick_cnt10 = 0;
+            time_past++;
+            if(check_stalled(time_past,0))
+            {
+               Motor_STOP();
+               if(state_in == RUNNING)
+               {
+                  value = cal_bagused(READ_ENCODER);
+                  MBB_USED += value;
+                  BAG_USED -= value;
+                  BAG_LEFT += value;
+                  if(BAG_USED >= OVERFLOW_LIM) BAG_USED = 0;
+                  return BLOCKED;   
+               }
+            }
+         }
+      }
+      Motor_STOP();
+      if(state_in == RUNNING)
+      {
+         value = cal_bagused(READ_ENCODER);
+         MBB_USED += value;
+         BAG_USED -= value;
+         BAG_LEFT += value;
+         if(BAG_USED >= OVERFLOW_LIM) BAG_USED = 0;
+      }
+   }
+   return state_in;
+}
+
+
+//This switch changes the STATE as required..
+int8 check_mode (int8 state_in)
+{
+   static int16 mode_cnt = 0;
+   static int8 pressed = 0;
+
+   if(!pressed)
+   {   if(!SET_MODE)
+      {
+         mode_cnt++;
+      }
+      else
+      {
+         mode_cnt = 0;
+      }
+      if(mode_cnt > STATE_CHANGED_LIMIT)
+      {   
+         state_in = state_in << 1;
+         if(state_in > OO_SERVICE) state_in = SERVICE;
+         mode_cnt = 0;
+         pressed = 1;
+         reset_beep();
+         set_beep(beep_cmode,(beep_cmode+10),once);
+      }
+   }
+   else
+   {
+      //must be released before next key press.
+      if(SET_MODE)
+      {
+         mode_cnt++;
+      }
+      else
+      {
+         mode_cnt = 0;
+      }
+      if(mode_cnt > debounce_time_released)
+      {
+         pressed = 0;
+         mode_cnt = 0;
+      }            
+   }
+   return state_in;
+}
+
+int8 check_reset (int8 state_in)
+{
+   static int16 rst_cnt = 0;
+   static int8 pressed = 0;
+
+   if(!pressed)
+   {   if(!RST_IN)
+      {
+         rst_cnt++;
+      }
+      else
+      {
+         rst_cnt = 0;
+      }
+      if(rst_cnt > RESET_STATE_LIMIT)
+      {   
+         pressed = 1;
+         reset_beep();
+         set_beep(beep_reset,(beep_reset+10),once);
+      }
+   }
+   else
+   {
+      //must be released before next key press.
+      if(RST_IN)
+      {
+         rst_cnt++;
+      }
+      else
+      {
+         rst_cnt = 0;
+      }
+      if(rst_cnt > debounce_time_released)
+      {
+         pressed = 0;
+         rst_cnt = 0;
+         state_in = RUNNING;
+      }            
+   }
+   return state_in;
+}
+
+
+int16 cal_bagused(int16 pulses_in)
+{
+   int32 value;
+
+   value = (int32)pulses_in * 100;
+   value = value/bag_used_constant;
+   value += 5;
+   return (int16)(value);
+}
+
+int8 check_stalled (int16 time_in,int16 init_count)
+{
+   int16 pulse_count,delta_pulse_count;
+   static int16 pulse_count_prev = 0;
+   static int8 block_count = 0;
+
+   pulse_count = READ_ENCODER - init_count;
+   //first check that the motor has started up OK
+   if(time_in == motor_start_delay)
+   {
+      if(pulse_count < min_startup_pulses) 
+      {   //blocked so abort 
+         return 1;
+      }
+      if(check_motor_over_I())
+      {   //over current detected on motor so abort 
+         return 1;
+      }
+   }
+   else if (time_in >= motor_run_delay)
+   {   //check for over  current every 100mS
+      if(check_motor_over_I())
+      {   //over current detected on motor so abort 
+         return 1;
+      }
+      //check for the correct number of pulses in 100mS      
+      if(pulse_count_prev == 0) 
+      {   //First time through the loop so just init pulse_count_prev
+         pulse_count_prev = pulse_count;
+      }
+      else
+      {   //Check the number of pulses in the last 100mS
+         delta_pulse_count = pulse_count - pulse_count_prev;
+         pulse_count_prev = pulse_count;
+         if(delta_pulse_count < min_pulse_count_10ticks)
+         {   
+            block_count++;
+            if(block_count > max_block_counts)
+            {   //Blockage, so abort  
+               block_count = 0;
+               return 1;
+            }
+         }
+      }
+   }
+   return 0;
+}
+
+
+void log_flush_bag_used(int16 flush_type)
+{
+   extern int16 TL_DATA[TX_MESS_WORDS];
+   int16 value;
+
+   
+   value = READ_ENCODER;
+   if(stop_flag == 1)
+   {   //cycle completed correctly, no blockage
+      value = cal_bagused(flush_type);
+   }
+   else
+   {   //cycle stopped prematurely   
+      value = max_count16 - value;
+      value = flush_type - value;
+      value = cal_bagused(value);
+   }
+
+   if(flush_type == short_flush)
+   {
+      NOS_FLUSH++;
+      NOSB_USED += value;
+   }
+   else
+   {
+      NOI_FLUSH++;   
+      NOIB_USED += value;
+   }
+   BAG_USED = BAG_USED + value;
+   BAG_LEFT = BAG_LEFT - value;
+   if(BAG_LEFT >= OVERFLOW_LIM) BAG_LEFT = 0;
+   stop_flag =   0;
+   ENCODER_ZERO;
+}
+
+
+
+void set_beep (int16 time, int16 rate, B_mode)
+{
+   extern int8 beep_mode;
+   extern int16 beep_rate,beep_time,beep_count;
+
+   beep_time = time;
+   beep_rate = rate;
+   beep_mode = B_mode;
+   beep_count = 0;
+   RESET_BEEP_IF;
+   EN_BEEP_INT;
+}
+
+void reset_beep (void)
+{   //reflect all changes to this in TIMER4 interrupt handler.
+   extern beep_count;
+
+   DIS_BEEP_INT;
+   RESET_BEEP_IF;
+   beep_count = 0;
+}
+
+void set_flash (int16 time, int16 rate, int16 what)    
+{
+   extern int8 flash_what;
+   extern int16 flash_rate,flash_time,flash_count;
+
+   flash_time = time;
+   flash_rate = rate;
+   flash_what = what;
+   flash_count = 0;
+   EN_FLASH_INT;
+}
+
+void reset_flash (void)
+{
+   DIS_FLASH_INT;
+   RESET_FLASH_IF;
+}
+
+
+int8 activate_flush (int16 f_length)
+{
+   extern int8 IO_STATE;
+   int16 tick_count,time_on = 0,release_cnt;
+   int8 Tick_cnt10 = 0;
+
+   Motor_FWD(max_count16 - f_length);
+   tick_count = 0;
+   while(stop_flag == 0)
+   {   //start the flush
+      wait_for_tick();
+      update_IO(IO_STATE);
+      tick_count++;
+      tick_cnt10++;
+      if(tick_cnt10 > 10)
+      {
+         tick_cnt10 = 0;
+         time_on++;
+         if(check_stalled(time_on,(max_count16-f_length)))
+         {
+            Motor_STOP();
+            LooSTATUS |= block_flag;   //log the blockage
+            NO_BLOCKS++;   
+            log_flush_bag_used(f_length);
+            return BLOCKED;
+         }
+      }
+   }
+   //Flush complete so stop and update log
+   Motor_STOP();   //motor should be stopped already, but no harm.
+   log_flush_bag_used(f_length);
+
+   //wait for the flush button to be released.
+   release_cnt = 0;
+   do
+   {
+      wait_for_tick();
+      update_IO(IO_STATE);
+      if(FLUSH_SW) 
+      {
+         release_cnt++;
+      }
+      else
+      {
+         release_cnt = 0;
+      }
+   }while(release_cnt < Flush_release_time);
+   IO_STATE |= FLUSH;
+   return RUNNING;   
+}
+
+int1 check_motor_over_I (void)
+{
+return 0;
+   if(OVER_I == 0)
+   {
+      delay_ms(2);
+      if(OVER_I == 0) return 1;
+   }
+   return 0;
+}

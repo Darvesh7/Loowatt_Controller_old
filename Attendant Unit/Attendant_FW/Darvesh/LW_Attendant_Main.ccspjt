@@ -1,0 +1,108 @@
+[PROJECT]
+Target=LW_Attendant_Main.hex
+Processor_Text=PIC18F66K90
+CCSVersion=5.082
+Compiler=PCH
+[Target Data]
+FileList=LW_Attendant_Main.c
+[LW_Attendant_Main.c]
+Type=4
+[mru-list]
+1=LW_Attendant_Main.c
+
+[defines]
+buildcount=30
+
+[Opened Files]
+1=LW_Attendant_Main.c
+t1=129
+Count=1
+
+[ProjectLog]
+Days=8
+D1=29-03-2019
+D1_L=2
+D1_L1=[32862]Stopped Editing.
+TotalEdit=39
+TotalDebug=0
+D1_E=1
+D1_D=0
+D1_L2=[32862]Project Closed.
+D2=04-04-2019
+D2_L=2
+D2_L1=[52080]Project Opened.
+D2_L2=[52230]Project Closed.
+D3=11-07-2019
+D3_L=28
+D3_L1=[44782]Project Opened.
+D3_L2=[49955]Started Editing.
+D3_L3=[50559]Stopped Editing.
+D3_E=29
+D3_D=0
+D3_L4=[51538]Project Closed.
+D3_L5=[52288]Project Opened.
+D3_L6=[52305]Started Editing.
+D3_L7=[52550]Stopped Editing.
+D3_L8=[52550]Project Closed.
+D3_L9=[53180]Project Opened.
+D3_L10=[53502]Started Editing.
+D3_L11=[53996]Stopped Editing.
+D3_L12=[54043]Started Editing.
+D3_L13=[54058]Stopped Editing.
+D3_L14=[54058]Project Closed.
+D3_L15=[55332]Project Opened.
+D3_L16=[55343]Started Editing.
+D3_L17=[55658]Stopped Editing.
+D3_L18=[57172]Started Editing.
+D3_L19=[57212]Stopped Editing.
+D3_L20=[57212]Project Closed.
+D3_L21=[57318]Project Opened.
+D3_L22=[57332]Started Editing.
+D3_L23=[57576]Stopped Editing.
+D3_L24=[57576]Project Closed.
+D3_L25=[61975]Project Opened.
+D3_L26=[61990]Started Editing.
+D3_L27=[62731]Stopped Editing.
+D3_L28=[62743]Project Closed.
+D4=12-07-2019
+D4_L=8
+D4_L1=[38419]Project Opened.
+D4_L2=[38490]Started Editing.
+D4_L3=[38507]Stopped Editing.
+D4_E=2
+D4_D=0
+D4_L4=[38507]Project Closed.
+D4_L5=[39498]Project Opened.
+D4_L6=[39511]Started Editing.
+D4_L7=[39811]Stopped Editing.
+D4_L8=[43084]Project Closed.
+D5=29-08-2019
+D5_L=2
+D5_L1=[59149]Project Opened.
+D5_L2=[59238]Project Closed.
+D6=11-09-2019
+D6_L=8
+D6_L1=[54455]Project Opened.
+D6_L2=[54687]Project Closed.
+D6_L3=[55305]Project Opened.
+D6_L4=[55365]Started Editing.
+D6_L5=[55951]Stopped Editing.
+D6_L6=[56163]Started Editing.
+D6_L7=[56283]Stopped Editing.
+D6_E=7
+D6_D=0
+D6_L8=[56283]Project Closed.
+D7=10-10-2019
+D7_L=2
+D7_L1=[34627]Project Opened.
+D7_L2=[35062]Project Closed.
+D8=20-11-2019
+D8_L=2
+D8_L1=[47569]Project Opened.
+D8_L2=[47601]Project Closed.
+
+[fileformats]
+forcecoff=0
+[Units]
+Count=1
+1=LW_Attendant_Main (main)

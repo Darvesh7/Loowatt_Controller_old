@@ -1,0 +1,6 @@
+Compiling C:\Users\Darvesh\Dropbox\Loowatt_calibrated_codes\Darvesh_Attendant_Controller_Firmware\Attendant_FW\Darvesh\LW_Attendant_Main on 11-Sep-19 at 15:36
+>>> Warning 238 "C:\Users\Darvesh\Dropbox\Loowatt_calibrated_codes\Darvesh_Attendant_Controller_Firmware\Attendant_FW\Darvesh\LW_Attendant_MAIN.h" Line 68(2,6): Duplicate #locate
+>>> Warning 230 "C:\Users\Darvesh\Dropbox\Loowatt_calibrated_codes\Darvesh_Attendant_Controller_Firmware\Attendant_FW\Darvesh\LW_Attendant_Menu.c" Line 202(1,1): String truncated
+      Memory usage:   ROM=30%      RAM=16% - 28%
+      0 Errors,  2 Warnings.
+Build Successful.

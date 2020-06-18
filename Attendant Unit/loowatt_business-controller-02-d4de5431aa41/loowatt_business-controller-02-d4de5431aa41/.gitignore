@@ -1,0 +1,15 @@
+*.mpc
+*.mcs
+*.mcw
+*.zip
+*.ccspjt
+*.coff
+*.err
+*.lst
+*.STA
+*.sym
+*.tre
+*.xsym
+*.esym
+*.cof
+/output_files/*
